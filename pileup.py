@@ -23,52 +23,52 @@ def exp_n(x, n):
 
 
 def mercator(x, n):
-    """Mercator series of order n of the exponential"""
+    """Mercator series of order n of the logarithm"""
     return np.sum([(-1) ** (j + 1) * x ** j / j for j in range(1, n + 1)])
 
 
-def _poisson_pile_series(y, l, n, bin_size=1):
-    f = np.array(l) * y  # the piled-up function
+def _poisson_pile_series(yy, l, n, bin_size=1):
+    f = np.array(l) * yy  # the piled-up function
     f_i = np.copy(f)  # i-th convolution power of f
     n_fact = l  # Hold lambda^i/i!
     # The first one is already added
     for i in range(2, n + 1):
         n_fact *= l / i
-        f_i = np.convolve(f_i, y)  # Longer first to avoid swapping
+        f_i = np.convolve(f_i, yy)  # Longer first to avoid swapping
         f_i /= sum(f_i) * bin_size
         f.resize(f_i.shape)
         f += f_i * np.array(n_fact)
 
-    return f[:len(y)] * np.array(1 / (np.exp(l) - 1))  # Make sure to cut added tails
+    return f[:len(yy)] * np.array(1 / (np.exp(l) - 1))  # Make sure to cut added tails
 
 
-def _poisson_pile_fourier(y, l, bin_size=1):
-    four = bin_size * l * np.fft.fft(y)  # Discrete Fourier Transform of lambda*y
+def _poisson_pile_fourier(yy, l, bin_size=1):
+    four = bin_size * l * np.fft.fft(yy)  # Discrete Fourier Transform of lambda*yy
     pile_factor = np.exp(l) - 1  # exp(lambda)-1
     piled_four = list(map(lambda t: (np.exp(t) - 1) / pile_factor, four))  # Piled-up function in Fourier Space
     return np.real(np.fft.ifft(piled_four)) / bin_size
 
 
-def _poisson_pile_fourier_series(y, l, n, bin_size=1):
-    four = bin_size * l * np.fft.fft(y)  # Discrete Fourier Transform of lambda*y
+def _poisson_pile_fourier_series(yy, l, n, bin_size=1):
+    four = bin_size * l * np.fft.fft(yy)  # Discrete Fourier Transform of lambda*yy
     pile_factor = np.exp(l) - 1  # exp(lambda)-1
     piled_four = list(map(lambda t: (exp_n(t, n) - 1) / pile_factor, four))  # Piled-up function in Fourier Space
     return np.real(np.fft.ifft(piled_four)) / bin_size
 
 
-def _poisson_pile_fourier_r(y, l, bin_size=1):
-    four = bin_size * l * np.fft.rfft(y)  # Discrete Fourier Transform of lambda*y
+def _poisson_pile_fourier_r(yy, l, bin_size=1):
+    four = bin_size * l * np.fft.rfft(yy)  # Discrete Fourier Transform of lambda*yy
     pile_factor = np.exp(l) - 1  # exp(lambda)-1
     piled_four = list(map(lambda t: (np.exp(t) - 1) / pile_factor, four))  # Piled-up function in Fourier Space
-    return np.fft.irfft(piled_four, len(y)) / bin_size
+    return np.fft.irfft(piled_four, len(yy)) / bin_size
 
 
-def poisson_pile(y, l, method='Fourier', series_order=10, bin_size=None, zero_pad=None):
+def poisson_pile(yy, l, method='Fourier', series_order=10, bin_size=None, zero_pad=None):
     """
     Calculate a piled spectrum.
 
     Args:
-        y: vector defining the original spectrum.
+        yy: vector defining the original spectrum.
         l: poisson piling parameter.
         method (str): the method used to calculate the piling. Available methods include:
 
@@ -85,33 +85,33 @@ def poisson_pile(y, l, method='Fourier', series_order=10, bin_size=None, zero_pa
         The piled spectrum
     """
     if l == 0.0:  # If pile-up is null, just copy the original spectrum
-        return y[:]
+        return yy[:]
 
     if not bin_size:
-        bin_size = 1 / sum(y)
+        bin_size = 1 / sum(yy)
 
     if zero_pad:
         if isinstance(zero_pad, int):
-            y = np.pad(y, (0, zero_pad), 'constant')
+            yy = np.pad(yy, (0, zero_pad), 'constant')
         else:
             raise TypeError("zero_pad must be an integer.")
 
     if not isinstance(method, str):
         print("Selected method is not a string. Using Fourier.", file=sys.stderr)
-        r = _poisson_pile_fourier(y, l, bin_size=bin_size)
+        r = _poisson_pile_fourier(yy, l, bin_size=bin_size)
     else:
         m = method.lower()
         if m == 'series':
-            r = _poisson_pile_series(y, l, series_order, bin_size=bin_size)
+            r = _poisson_pile_series(yy, l, series_order, bin_size=bin_size)
         elif m == 'fourier':
-            r = _poisson_pile_fourier_r(y, l, bin_size=bin_size)
+            r = _poisson_pile_fourier_r(yy, l, bin_size=bin_size)
         elif m == "fourierc" or m == "fourier_c" or m == "fourier-c":
-            r = _poisson_pile_fourier(y, l, bin_size=bin_size)
+            r = _poisson_pile_fourier(yy, l, bin_size=bin_size)
         elif m == 'fourier_series':
-            r = _poisson_pile_fourier_series(y, l, series_order, bin_size=bin_size)
+            r = _poisson_pile_fourier_series(yy, l, series_order, bin_size=bin_size)
         else:
             print("Unknown method selected. Using Fourier.", file=sys.stderr)
-            r = _poisson_pile_fourier(y, l, bin_size=bin_size)
+            r = _poisson_pile_fourier(yy, l, bin_size=bin_size)
 
     if zero_pad:
         return r[:-zero_pad]
@@ -119,16 +119,16 @@ def poisson_pile(y, l, method='Fourier', series_order=10, bin_size=None, zero_pa
         return r
 
 
-def _poisson_depile_series(y, l, n, bin_size=1):
+def _poisson_depile_series(yy, l, n, bin_size=1):
     # BEWARE: This method fails to depile spectra... but the failure is mathematical!
     # Note this is analogous to the Mercator series, which only converges in (-1,1]
-    f = np.array(np.exp(l) - 1) * y  # the depiled-up function
-    f_i = np.copy(y)  # i-th convolution power of y
+    f = np.array(np.exp(l) - 1) * yy  # the depiled-up function
+    f_i = np.copy(yy)  # i-th convolution power of yy
     n_fact = 1  # (-1)^(i+1)*(exp(lambda)-1)^i
     # The first one is already added
     for i in range(2, n + 1):
         n_fact *= -1 * (np.exp(l) - 1)
-        f_i = np.convolve(f_i, y)  # Longer first to avoid swapping
+        f_i = np.convolve(f_i, yy)  # Longer first to avoid swapping
         f_i /= sum(f_i) * bin_size
         f.resize(f_i.shape)
         f += f_i * np.array(n_fact / i)
@@ -136,33 +136,33 @@ def _poisson_depile_series(y, l, n, bin_size=1):
     return f / np.array(l)
 
 
-def _poisson_depile_fourier(y, l, bin_size=1):
-    four = bin_size * np.fft.fft(y)  # Discrete Fourier Transform of y
+def _poisson_depile_fourier(yy, l, bin_size=1):
+    four = bin_size * np.fft.fft(yy)  # Discrete Fourier Transform of yy
     depile_factor = np.exp(l) - 1  # exp(lambda)-1
     depiled_four = list(map(lambda t: np.log(1 + depile_factor * t) / l, four))  # Depiled function in Fourier Space
     return np.real(np.fft.ifft(depiled_four)) / bin_size
 
 
-def _poisson_depile_fourier_r(y, l, bin_size=1):
-    four = bin_size * np.fft.rfft(y)  # Discrete Fourier Transform of y
+def _poisson_depile_fourier_r(yy, l, bin_size=1):
+    four = bin_size * np.fft.rfft(yy)  # Discrete Fourier Transform of yy
     depile_factor = np.exp(l) - 1  # exp(lambda)-1
     depiled_four = list(map(lambda t: np.log(1 + depile_factor * t) / l, four))  # Depiled function in Fourier Space
-    return np.fft.irfft(depiled_four, len(y)) / bin_size
+    return np.fft.irfft(depiled_four, len(yy)) / bin_size
 
 
-def _poisson_depile_fourier_series(y, l, n, bin_size=1):
-    four = bin_size * np.fft.fft(y)  # Discrete Fourier Transform of y
+def _poisson_depile_fourier_series(yy, l, n, bin_size=1):
+    four = bin_size * np.fft.fft(yy)  # Discrete Fourier Transform of yy
     depile_factor = np.exp(l) - 1  # exp(lambda)-1
     depiled_four = list(map(lambda t: (mercator(depile_factor * t, n)) / l, four))  # Piled-up function in Fourier Space
     return np.real(np.fft.ifft(depiled_four)) / bin_size
 
 
-def poisson_depile(y, l, method='Fourier', series_order=20, bin_size=None, zero_pad=None):
+def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero_pad=None):
     """
         Calculate a piled spectrum.
 
         Args:
-            y: vector defining the piled spectrum.
+            yy: vector defining the piled spectrum.
             l: poisson piling parameter.
             method (str): the method used to calculate the depiling. Available methods include:
 
@@ -180,33 +180,33 @@ def poisson_depile(y, l, method='Fourier', series_order=20, bin_size=None, zero_
     """
 
     if l == 0.0:  # If pile-up is null, just copy the original spectrum
-        return y[:]
+        return yy[:]
 
     if not bin_size:
-        bin_size = 1 / sum(y)
+        bin_size = 1 / sum(yy)
 
     if zero_pad:
         if isinstance(zero_pad, int):
-            y = np.pad(y, (0, zero_pad), 'constant')
+            yy = np.pad(yy, (0, zero_pad), 'constant')
         else:
             raise TypeError("zero_pad must be an integer.")
 
     if not isinstance(method, str):
         print("Selected method is not a string. Using Fourier.", file=sys.stderr)
-        return _poisson_depile_fourier(y, l)
+        return _poisson_depile_fourier(yy, l)
 
     m = method.lower()
     if m == 'series':
-        r = _poisson_depile_series(y, l, series_order, bin_size=bin_size)
+        r = _poisson_depile_series(yy, l, series_order, bin_size=bin_size)
     elif m == 'fourier':
-        r = _poisson_depile_fourier_r(y, l, bin_size=bin_size)
+        r = _poisson_depile_fourier_r(yy, l, bin_size=bin_size)
     elif m == "fourierc" or m == "fourier_c" or m == "fourier-c":
-        r = _poisson_depile_fourier(y, l, bin_size=bin_size)
+        r = _poisson_depile_fourier(yy, l, bin_size=bin_size)
     elif m == 'fourier_series':
-        r = _poisson_depile_fourier_series(y, l, series_order, bin_size=bin_size)
+        r = _poisson_depile_fourier_series(yy, l, series_order, bin_size=bin_size)
     else:
         print("Unknown method selected. Using Fourier.", file=sys.stderr)
-        r = _poisson_depile_fourier(y, l, bin_size=bin_size)
+        r = _poisson_depile_fourier(yy, l, bin_size=bin_size)
 
     if zero_pad:
         return r[:-zero_pad]
