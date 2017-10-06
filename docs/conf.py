@@ -34,7 +34,7 @@ if on_rtd:
         def __getattr__(cls, name):
             return MagicMock()
 
-    MOCK_MODULES = ['numpy', 'scipy', 'scipy.stats']
+    MOCK_MODULES = ['numpy', 'scipy', 'scipy.linalg', 'scipy.optimize']
     sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # -- General configuration ------------------------------------------------

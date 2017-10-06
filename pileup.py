@@ -7,6 +7,8 @@ from __future__ import print_function
 
 import sys
 import numpy as np
+from scipy.linalg import dft
+from scipy.optimize import nnls, curve_fit
 
 __author__ = 'Dih5'
 __version__ = "0.1.0"
@@ -27,7 +29,7 @@ def mercator(x, n):
     return np.sum([(-1) ** (j + 1) * x ** j / j for j in range(1, n + 1)])
 
 
-def _poisson_pile_series(yy, l, n, bin_size=1):
+def _poisson_pile_series(yy, l, n, bin_size=1.0):
     f = np.array(l) * yy  # the piled-up function
     f_i = np.copy(f)  # i-th convolution power of f
     n_fact = l  # Hold lambda^i/i!
@@ -42,21 +44,21 @@ def _poisson_pile_series(yy, l, n, bin_size=1):
     return f[:len(yy)] * np.array(1 / (np.exp(l) - 1))  # Make sure to cut added tails
 
 
-def _poisson_pile_fourier(yy, l, bin_size=1):
+def _poisson_pile_fourier(yy, l, bin_size=1.0):
     four = bin_size * l * np.fft.fft(yy)  # Discrete Fourier Transform of lambda*yy
     pile_factor = np.exp(l) - 1  # exp(lambda)-1
     piled_four = list(map(lambda t: (np.exp(t) - 1) / pile_factor, four))  # Piled-up function in Fourier Space
     return np.real(np.fft.ifft(piled_four)) / bin_size
 
 
-def _poisson_pile_fourier_series(yy, l, n, bin_size=1):
+def _poisson_pile_fourier_series(yy, l, n, bin_size=1.0):
     four = bin_size * l * np.fft.fft(yy)  # Discrete Fourier Transform of lambda*yy
     pile_factor = np.exp(l) - 1  # exp(lambda)-1
     piled_four = list(map(lambda t: (exp_n(t, n) - 1) / pile_factor, four))  # Piled-up function in Fourier Space
     return np.real(np.fft.ifft(piled_four)) / bin_size
 
 
-def _poisson_pile_fourier_r(yy, l, bin_size=1):
+def _poisson_pile_fourier_r(yy, l, bin_size=1.0):
     four = bin_size * l * np.fft.rfft(yy)  # Discrete Fourier Transform of lambda*yy
     pile_factor = np.exp(l) - 1  # exp(lambda)-1
     piled_four = list(map(lambda t: (np.exp(t) - 1) / pile_factor, four))  # Piled-up function in Fourier Space
@@ -121,7 +123,7 @@ def poisson_pile(yy, l, method='Fourier', series_order=10, bin_size=None, zero_p
         return r
 
 
-def _poisson_depile_series(yy, l, n, bin_size=1):
+def _poisson_depile_series(yy, l, n, bin_size=1.0):
     # BEWARE: This method fails to depile spectra... but the failure is mathematical!
     # Note this is analogous to the Mercator series, which only converges in (-1,1]
     f = np.array(np.exp(l) - 1) * yy  # the depiled-up function
@@ -138,28 +140,55 @@ def _poisson_depile_series(yy, l, n, bin_size=1):
     return f / np.array(l)
 
 
-def _poisson_depile_fourier(yy, l, bin_size=1):
+def _poisson_depile_fourier(yy, l, bin_size=1.0):
     four = bin_size * np.fft.fft(yy)  # Discrete Fourier Transform of yy
     depile_factor = np.exp(l) - 1  # exp(lambda)-1
     depiled_four = list(map(lambda t: np.log(1 + depile_factor * t) / l, four))  # Depiled function in Fourier Space
     return np.real(np.fft.ifft(depiled_four)) / bin_size
 
 
-def _poisson_depile_fourier_r(yy, l, bin_size=1):
+def _poisson_depile_fourier_r(yy, l, bin_size=1.0):
     four = bin_size * np.fft.rfft(yy)  # Discrete Fourier Transform of yy
     depile_factor = np.exp(l) - 1  # exp(lambda)-1
     depiled_four = list(map(lambda t: np.log(1 + depile_factor * t) / l, four))  # Depiled function in Fourier Space
     return np.fft.irfft(depiled_four, len(yy)) / bin_size
 
 
-def _poisson_depile_fourier_series(yy, l, n, bin_size=1):
+def _poisson_depile_fourier_series(yy, l, n, bin_size=1.0):
     four = bin_size * np.fft.fft(yy)  # Discrete Fourier Transform of yy
     depile_factor = np.exp(l) - 1  # exp(lambda)-1
     depiled_four = list(map(lambda t: (mercator(depile_factor * t, n)) / l, four))  # Piled-up function in Fourier Space
     return np.real(np.fft.ifft(depiled_four)) / bin_size
 
 
-def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero_pad=None):
+def _poisson_depile_nnls(y, l, bin_size=1.0, norm_penalty=10.):
+    four = bin_size * np.fft.fft(y)  # Discrete Fourier Transform of y
+    depile_factor = np.exp(l) - 1  # exp(lambda)-1
+    depiled_four = list(map(lambda t: np.log(1 + depile_factor * t) / l, four))  # Depiled function in Fourier Space
+    m = dft(len(y))
+    m_real = np.concatenate((m.real, m.imag), axis=0)
+    depiled_four = np.asarray(depiled_four)
+    depiled_four_real = np.concatenate((depiled_four.real, depiled_four.imag), axis=0)
+    if norm_penalty:
+        (x, _) = nnls(np.concatenate((m_real, norm_penalty * np.ones((1, m_real.shape[1]))), axis=0),
+                      np.append(depiled_four_real, norm_penalty * sum(y) * bin_size))
+    else:
+        (x, _) = nnls(m_real, depiled_four_real)
+    return x / bin_size
+
+
+def _poisson_depile_parametric_fit(yy, l, f, par_0=None, bin_size=1):
+    xx = np.linspace(0, len(yy) * bin_size, len(yy))
+
+    def _piled_function(*args):
+        return poisson_pile(f(*args), l)
+
+    popt, pcov = curve_fit(_piled_function, np.linspace(0, len(yy) * bin_size, len(yy)), yy, p0=par_0)
+    return f(xx, *popt)
+
+
+def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero_pad=None, norm_penalty=10., f=None,
+                   par_0=None):
     """
         Calculate a depiled spectrum.
 
@@ -172,9 +201,14 @@ def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero
                 * "fourier": "Exact" solution in the fourier domain.
                 * "fourier_c": Same as fourier, using the fft instead of rfft.
                 * "fourier_series": A series expansion in the fourier domain.
+                * "nnls": Non-negative least squares fit.
+                * "parametric": Non-linear least squares to fit a function.
 
 
             series_order (int): the number of terms used in a series expansion method.
+            norm_penalty (float): if "nnls" is used, a factor used to impose the normalization as a penality function. Increse the value to ensure normalization. Use 0 to impose no condition on the norm.
+            f (callable): if "parametric" is used, the model function, which takes the independent variable as as the first argument and the parameters to fit as separate remaining arguments.
+            par_0 (list of float): if "parametric" is used, the initial guess for the parameters. If None, then the initial values will all be 1 (if the number of parameters for the function can be determined using introspection, otherwise a ValueError is raised).
             bin_size (float): dE in the spectrum. If None, chosen so it is normalized.
             zero_pad (int): Number of zeros to pad to the end of yy.
 
@@ -208,6 +242,12 @@ def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero
         r = _poisson_depile_fourier(yy, l, bin_size=bin_size)
     elif m == 'fourier_series':
         r = _poisson_depile_fourier_series(yy, l, series_order, bin_size=bin_size)
+    elif m == 'nnls':
+        r = _poisson_depile_nnls(yy, l, bin_size=bin_size, norm_penalty=norm_penalty)
+    elif m == 'parametric':
+        if f is None:
+            raise TypeError("A function must be supplied to make a parametric fit.")
+        r = _poisson_depile_parametric_fit(yy, l, f, par_0=par_0, bin_size=bin_size)
     else:
         print("Unknown method selected. Using Fourier.", file=sys.stderr)
         r = _poisson_depile_fourier(yy, l, bin_size=bin_size)
