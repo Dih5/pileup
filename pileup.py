@@ -68,21 +68,23 @@ def poisson_pile(yy, l, method='Fourier', series_order=10, bin_size=None, zero_p
     Calculate a piled spectrum.
 
     Args:
-        yy: vector defining the original spectrum.
-        l: poisson piling parameter.
+        yy (list of float): vector defining the original spectrum.
+        l (float): poisson piling parameter.
         method (str): the method used to calculate the piling. Available methods include:
 
             * "series": A series expansion of the convolution exponential.
             * "fourier": "Exact" solution in the fourier domain.
             * "fourier_c": Same as fourier, using the fft instead of rfft.
-            * fourier_series: A series expansion in the fourier domain.
+            * "fourier_series": A series expansion in the fourier domain.
 
 
-        series_order: the number of terms used in a series expansion method.
-        bin_size: dE in the spectrum. If None, chosen so it is normalized.
+        series_order (int): the number of terms used in a series expansion method.
+        bin_size(float): dE in the spectrum. If None, automatically chosen so it is normalized.
+        zero_pad (int): Number of zeros to pad to the end of yy.
 
     Returns:
-        The piled spectrum
+        (`numpy.ndarray`): The piled spectrum.
+        
     """
     if l == 0.0:  # If pile-up is null, just copy the original spectrum
         return yy[:]
@@ -159,24 +161,26 @@ def _poisson_depile_fourier_series(yy, l, n, bin_size=1):
 
 def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero_pad=None):
     """
-        Calculate a piled spectrum.
+        Calculate a depiled spectrum.
 
         Args:
-            yy: vector defining the piled spectrum.
-            l: poisson piling parameter.
+            yy (list of float): vector defining the piled spectrum.
+            l (float): poisson piling parameter.
             method (str): the method used to calculate the depiling. Available methods include:
 
-                * "series": A series expansion of the convolution exponential.
+                * "series": A series expansion analogous to the Mercator series. MIGHT NOT CONVERGE.
                 * "fourier": "Exact" solution in the fourier domain.
                 * "fourier_c": Same as fourier, using the fft instead of rfft.
-                * fourier_series: A series expansion in the fourier domain.
+                * "fourier_series": A series expansion in the fourier domain.
 
 
-            series_order: the number of terms used in a series expansion method.
-            bin_size: dE in the spectrum. If None, chosen so it is normalized.
+            series_order (int): the number of terms used in a series expansion method.
+            bin_size (float): dE in the spectrum. If None, chosen so it is normalized.
+            zero_pad (int): Number of zeros to pad to the end of yy.
 
         Returns:
-            The depiled spectrum
+            (`numpy.ndarray`): The depiled spectrum.
+            
     """
 
     if l == 0.0:  # If pile-up is null, just copy the original spectrum
