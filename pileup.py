@@ -177,18 +177,21 @@ def _poisson_depile_nnls(y, l, bin_size=1.0, norm_penalty=10.):
     return x / bin_size
 
 
-def _poisson_depile_parametric_fit(yy, l, f, par_0=None, bin_size=1):
+def _poisson_depile_parametric_fit(yy, l, f, par_0=None, bin_size=1, fit_pars=None):
     xx = np.linspace(0, len(yy) * bin_size, len(yy))
 
     def _piled_function(*args):
         return poisson_pile(f(*args), l)
 
     popt, pcov = curve_fit(_piled_function, np.linspace(0, len(yy) * bin_size, len(yy)), yy, p0=par_0)
+    if fit_pars is not None:
+        fit_pars.append(popt)
+        fit_pars.append(pcov)
     return f(xx, *popt)
 
 
 def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero_pad=None, norm_penalty=10., f=None,
-                   par_0=None):
+                   par_0=None, fit_pars=None):
     """
         Calculate a depiled spectrum.
 
@@ -202,13 +205,14 @@ def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero
                 * "fourier_c": Same as fourier, using the fft instead of rfft.
                 * "fourier_series": A series expansion in the fourier domain.
                 * "nnls": Non-negative least squares fit.
-                * "parametric": Non-linear least squares to fit a function.
+                * "parametric": Non-linear least squares to fit a function using `scipy.optimize.curve_fit`.
 
 
             series_order (int): the number of terms used in a series expansion method.
             norm_penalty (float): if "nnls" is used, a factor used to impose the normalization as a penality function. Increse the value to ensure normalization. Use 0 to impose no condition on the norm.
             f (callable): if "parametric" is used, the model function, which takes the independent variable as as the first argument and the parameters to fit as separate remaining arguments.
             par_0 (list of float): if "parametric" is used, the initial guess for the parameters. If None, then the initial values will all be 1 (if the number of parameters for the function can be determined using introspection, otherwise a ValueError is raised).
+            fit_pars (list): If "parametric" is used, provide an empty list to recover the best-fit parameters and the covariance estimation. See `scipy.optimize.curve_fit`. 
             bin_size (float): dE in the spectrum. If None, chosen so it is normalized.
             zero_pad (int): Number of zeros to pad to the end of yy.
 
@@ -247,7 +251,7 @@ def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero
     elif m == 'parametric':
         if f is None:
             raise TypeError("A function must be supplied to make a parametric fit.")
-        r = _poisson_depile_parametric_fit(yy, l, f, par_0=par_0, bin_size=bin_size)
+        r = _poisson_depile_parametric_fit(yy, l, f, par_0=par_0, bin_size=bin_size, fit_pars=fit_pars)
     else:
         print("Unknown method selected. Using Fourier.", file=sys.stderr)
         r = _poisson_depile_fourier(yy, l, bin_size=bin_size)
