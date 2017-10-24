@@ -32,8 +32,8 @@ class PileupTest(unittest.TestCase):
             for l in [0.01, 0.2, 1, 2]:
                 for distribution in distributions:
                     yy = distribution(xx)
-                    piled = poisson_pile(yy, l)
-                    depiled = poisson_depile(piled, l)
+                    piled = pile(yy, l)
+                    depiled = depile(piled, l)
 
                     self.assertAlmostEqual(l1(yy, depiled), 0)
 
@@ -45,9 +45,9 @@ class PileupTest(unittest.TestCase):
                 for distribution in distributions:
                     yy = distribution(xx)
 
-                    piled_fourier = poisson_pile(yy, l, method="Fourier")
-                    piled_fourier_c = poisson_pile(yy, l, method="Fourier-C")
-                    piled_fourier_series = poisson_pile(yy, l, method="Fourier_Series", series_order=30)
+                    piled_fourier = pile(yy, l, method="Fourier")
+                    piled_fourier_c = pile(yy, l, method="Fourier-C")
+                    piled_fourier_series = pile(yy, l, method="Fourier_Series", series_order=30)
 
                     self.assertAlmostEqual(l1(piled_fourier, piled_fourier_c), 0)
                     self.assertAlmostEqual(l1(piled_fourier, piled_fourier_series), 0)
@@ -60,8 +60,8 @@ class PileupTest(unittest.TestCase):
                 for distribution in distributions:
                     yy = distribution(xx)
 
-                    depiled_fourier = poisson_depile(yy, l, method="Fourier")
-                    depiled_fourier_c = poisson_depile(yy, l, method="Fourier-C")
+                    depiled_fourier = depile(yy, l, method="Fourier")
+                    depiled_fourier_c = depile(yy, l, method="Fourier-C")
 
                     self.assertAlmostEqual(l1(depiled_fourier, depiled_fourier_c), 0)
 
