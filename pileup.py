@@ -7,8 +7,8 @@ from __future__ import print_function
 
 import sys
 import numpy as np
-from scipy.linalg import dft
-from scipy.optimize import nnls, curve_fit
+from scipy.optimize import fmin_l_bfgs_b, curve_fit
+from scipy.spatial.distance import sqeuclidean
 
 __author__ = 'Dih5'
 __version__ = "0.1.0"
@@ -161,20 +161,16 @@ def _poisson_depile_fourier_series(yy, l, n, bin_size=1.0):
     return np.real(np.fft.ifft(depiled_four)) / bin_size
 
 
-def _poisson_depile_nnls(y, l, bin_size=1.0, norm_penalty=10.):
-    four = bin_size * np.fft.fft(y)  # Discrete Fourier Transform of y
-    depile_factor = np.exp(l) - 1  # exp(lambda)-1
-    depiled_four = list(map(lambda t: np.log(1 + depile_factor * t) / l, four))  # Depiled function in Fourier Space
-    m = dft(len(y))
-    m_real = np.concatenate((m.real, m.imag), axis=0)
-    depiled_four = np.asarray(depiled_four)
-    depiled_four_real = np.concatenate((depiled_four.real, depiled_four.imag), axis=0)
-    if norm_penalty:
-        (x, _) = nnls(np.concatenate((m_real, norm_penalty * np.ones((1, m_real.shape[1]))), axis=0),
-                      np.append(depiled_four_real, norm_penalty * sum(y) * bin_size))
-    else:
-        (x, _) = nnls(m_real, depiled_four_real)
-    return x / bin_size
+def _poisson_depile_nonparametric_fit(yy, l, depiled_0=None, bin_size=1.0):
+
+    def distance_function(yy_tentative):
+        return sqeuclidean(poisson_pile(yy_tentative, l, bin_size=bin_size), yy)
+
+    if depiled_0 is None:
+        depiled_0 = np.repeat(1 / len(yy), len(yy))
+
+    x, y, d = fmin_l_bfgs_b(distance_function, depiled_0, bounds=[(0, np.inf) for _ in range(len(yy))], approx_grad=True)
+    return x
 
 
 def _poisson_depile_parametric_fit(yy, l, f, par_0=None, bin_size=1, fit_pars=None):
@@ -190,8 +186,8 @@ def _poisson_depile_parametric_fit(yy, l, f, par_0=None, bin_size=1, fit_pars=No
     return f(xx, *popt)
 
 
-def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero_pad=None, norm_penalty=10., f=None,
-                   par_0=None, fit_pars=None):
+def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero_pad=None, f=None,
+                   par_0=None, fit_pars=None, depiled_0=None):
     """
         Calculate a depiled spectrum.
 
@@ -200,24 +196,27 @@ def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero
             l (float): poisson piling parameter.
             method (str): the method used to calculate the depiling. Available methods include:
 
-                * "series": A series expansion analogous to the Mercator series. MIGHT NOT CONVERGE.
+                * "series": A series expansion analogous to the Mercator series. **Might not converge**.
                 * "fourier": "Exact" solution in the fourier domain.
                 * "fourier_c": Same as fourier, using the fft instead of rfft.
                 * "fourier_series": A series expansion in the fourier domain.
-                * "nnls": Non-negative least squares fit.
-                * "parametric": Non-linear least squares to fit a function using `scipy.optimize.curve_fit`.
+                * "parametric": Non-linear least squares fit a function using `scipy.optimize.curve_fit`.
+                * "nonparametric": Non-linear least squares vector minimization using `scipy.optimize.fmin_l_bfgs_b`.
 
 
             series_order (int): the number of terms used in a series expansion method.
-            norm_penalty (float): if "nnls" is used, a factor used to impose the normalization as a penality function. Increse the value to ensure normalization. Use 0 to impose no condition on the norm.
             f (callable): if "parametric" is used, the model function, which takes the independent variable as as the first argument and the parameters to fit as separate remaining arguments.
             par_0 (list of float): if "parametric" is used, the initial guess for the parameters. If None, then the initial values will all be 1 (if the number of parameters for the function can be determined using introspection, otherwise a ValueError is raised).
             fit_pars (list): If "parametric" is used, provide an empty list to recover the best-fit parameters and the covariance estimation. See `scipy.optimize.curve_fit`. 
+            depiled_0 (list of float): if "nonparametric" is used, the initial guess for the distribution. If None, the uniform distribution will be the starting distribution.
             bin_size (float): dE in the spectrum. If None, chosen so it is normalized.
             zero_pad (int): Number of zeros to pad to the end of yy.
 
         Returns:
             (`numpy.ndarray`): The depiled spectrum.
+            
+        Note:
+            "parametric" and "nonparametric" methods might return non-global best-fits. Also, the time taken might be long, specially in "nonparametric".
             
     """
 
@@ -246,8 +245,8 @@ def poisson_depile(yy, l, method='Fourier', series_order=20, bin_size=None, zero
         r = _poisson_depile_fourier(yy, l, bin_size=bin_size)
     elif m == 'fourier_series':
         r = _poisson_depile_fourier_series(yy, l, series_order, bin_size=bin_size)
-    elif m == 'nnls':
-        r = _poisson_depile_nnls(yy, l, bin_size=bin_size, norm_penalty=norm_penalty)
+    elif m == 'nonparametric':
+        r = _poisson_depile_nonparametric_fit(yy, l, bin_size=bin_size, depiled_0=depiled_0)
     elif m == 'parametric':
         if f is None:
             raise TypeError("A function must be supplied to make a parametric fit.")
