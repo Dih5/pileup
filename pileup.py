@@ -157,23 +157,24 @@ def _depile_fourier_r(yy, l, bin_size=1.0):
 def _depile_fourier_series(yy, l, n, bin_size=1.0):
     four = bin_size * np.fft.fft(yy)  # Discrete Fourier Transform of yy
     depile_factor = np.exp(l) - 1  # exp(lambda)-1
-    depiled_four = list(map(lambda t: (_mercator(depile_factor * t, n)) / l, four))  # Piled-up function in Fourier Space
+    depiled_four = list(
+        map(lambda t: (_mercator(depile_factor * t, n)) / l, four))  # Piled-up function in Fourier Space
     return np.real(np.fft.ifft(depiled_four)) / bin_size
 
 
 def _depile_nonparametric_fit(yy, l, depiled_0=None, bin_size=1.0):
-
     def distance_function(yy_tentative):
         return sqeuclidean(pile(yy_tentative, l, bin_size=bin_size), yy)
 
     if depiled_0 is None:
         depiled_0 = np.repeat(1 / len(yy), len(yy))
 
-    x, y, d = fmin_l_bfgs_b(distance_function, depiled_0, bounds=[(0, np.inf) for _ in range(len(yy))], approx_grad=True)
+    x, y, d = fmin_l_bfgs_b(distance_function, depiled_0, bounds=[(0, np.inf) for _ in range(len(yy))],
+                            approx_grad=True)
     return x
 
 
-def _depile_parametric_fit(yy, l, f, par_0=None, bin_size=1, fit_pars=None):
+def _depile_parametric_fit(yy, l, f, par_0=None, bin_size=1.0, fit_pars=None):
     xx = np.linspace(0, len(yy) * bin_size, len(yy))
 
     def _piled_function(*args):
