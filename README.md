@@ -4,7 +4,7 @@ A Python module with some implementations to use the pile-up model presented in 
 
 To install the module in a system with Python and pip run
 ```
-pip install https://github.com/django/django/archive/master.zip
+pip install https://github.com/Dih5/pileup/archive/master.zip
 ```
 Alternatively, you can just [download it](https://raw.githubusercontent.com/Dih5/pileup/master/pileup.py) and place it where you need it.
 
