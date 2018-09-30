@@ -5,6 +5,8 @@
 
 from __future__ import print_function
 
+import math
+
 import sys
 import numpy as np
 from scipy.optimize import fmin_l_bfgs_b, curve_fit
@@ -17,6 +19,16 @@ __version__ = "0.1.0"
 def poisson_lambda(rate):
     """Return the poisson characteristic parameter, given a rate of counting/pulse frequency"""
     return -np.log(1 - rate)
+
+
+def count_to_particle_ratio(l):
+    """
+    Return the expected value of the ratio of the number of particles arriving in a detector with the number of counts.
+
+    This number is calculated assuming the number of counts per pulse in a detection is a random process conditioned by
+    (number of counts > 0). Thus, the formula is $\frac{\lambda}{1-e^{-\lambda}}$.
+    """
+    return l/(1-math.exp(-l))
 
 
 def _exp_n(x, n):
