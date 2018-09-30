@@ -25,8 +25,9 @@ def count_to_particle_ratio(l):
     """
     Return the expected value of the ratio of the number of particles arriving in a detector with the number of counts.
 
-    This number is calculated assuming the number of counts per pulse in a detection is a random process conditioned by
-    (number of counts > 0). Thus, the formula is $\frac{\lambda}{1-e^{-\lambda}}$.
+    This number is calculated assuming the number of counts per pulse  in a detection is a random process conditioned by
+    (number of counts > 0). Thus, the factor is given by :math:`\\frac{\\lambda}{1-e^{-\\lambda}}`.
+
     """
     return l/(1-math.exp(-l))
 
